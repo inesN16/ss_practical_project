@@ -1,12 +1,18 @@
 name: 3 - Continuous Deployment
 run-name: "${{ github.workflow }}"
 
+#on:
+ # workflow_dispatch:
+  #  inputs:
+   #   image_tag:
+    #    description: "Image tag to deploy (e.g., dev or a specific commit SHA)"
+     #   required: true
+
 on:
-  workflow_dispatch:
-    inputs:
-      image_tag:
-        description: "Image tag to deploy (e.g., dev or a specific commit SHA)"
-        required: true
+  workflow_run:
+    workflows: ["2 - Continuous Delivery"] # O nome tem de ser igual ao 'name' do ficheiro 2
+    types:
+      - completed
 
 permissions:
   contents: read
