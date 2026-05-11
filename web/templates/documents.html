@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block content %}
+<p id="title-preview" class="muted"></p>
+<section class="grid">
+  <div class="card">
+    <h2>Upload document</h2>
+    <form method="post" action="{{ url_for('upload_document') }}" enctype="multipart/form-data">
+      <label>Title</label>
+      <input type="text" name="title" required>
+
+      <label>File</label>
+      <input type="file" name="document" required>
+
+      <button type="submit">Upload</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2>Documents</h2>
+    <p class="muted">Showing documents for user id: {{ requested_user_id }}</p>
+    {% if documents %}
+    <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
+    <thead>
+        <tr style="background-color: #f8f9fa; border-bottom: 2px solid #dee2e6; text-align: left;">
+            <th style="padding: 12px;">ID</th>
+            <th style="padding: 12px;">Título</th>
+            <th style="padding: 12px;">Ficheiro</th>
+            <th style="padding: 12px;">Ações</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for doc in documents %}
+        <tr style="border-bottom: 1px solid #eee;">
+            <td style="padding: 12px;">{{ doc.id }}</td>
+            <td style="padding: 12px;"><strong>{{ doc.title }}</strong></td>
+            <td style="padding: 12px; font-family: monospace; font-size: 0.9em;">{{ doc.filename }}</td>
+            <td style="padding: 12px;">
+                <a href="{{ url_for('document_details', document_id=doc.id) }}" 
+                   style="text-decoration: none; padding: 5px 10px; background: #6c757d; color: white; border-radius: 4px; font-size: 0.8em;">🔍 Detalhes</a>
+                
+                <a href="{{ url_for('download_document', document_id=doc.id) }}" 
+                   style="text-decoration: none; padding: 5px 10px; background: #007bff; color: white; border-radius: 4px; font-size: 0.8em; margin-left: 5px;">📥 Download</a>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<div style="margin-top: 20px; padding: 15px; background: #e9ecef; border-radius: 8px;">
+    <a href="{{ url_for('shared_with_me') }}" style="text-decoration: none; color: #495057; font-weight: bold;">
+        📂 Ver ficheiros partilhados comigo
+    </a>
+</div>
+    {% else %}
+      <p>No documents found.</p>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

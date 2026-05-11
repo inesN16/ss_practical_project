@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="card">
+  <h2>Document details</h2>
+
+  <p><strong>ID:</strong> {{ document.id }}</p>
+  <p><strong>Owner:</strong> {{ document.owner_id }}</p>
+  <p><strong>Title:</strong> {{ document.title }}</p>
+  <p><strong>Filename:</strong> {{ document.filename }}</p>
+
+
+    <h3>Metadata</h3>
+    <pre>{{ document.metadata }}</pre>
+
+    <h4>Partilhar este documento</h3>
+    <form action="{{ url_for('share_document', document_id=document.id) }}" method="post">
+        <label for="shared_with">ID do Utilizador:</label>
+        <input type="number" name="shared_with" placeholder="Ex: 3" required>
+        <button type="submit">Partilhar</button>
+    </form>
+
+</div>
+{% endblock %}

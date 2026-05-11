@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+    <h2>Gestão de Utilizadores (Painel Admin)</h2>
+    <table style="width:100%; border-collapse: collapse;">
+        <thead>
+            <tr style="background-color: #f4f4f4;">
+                <th>ID</th>
+                <th>Username</th>
+                <th>Estado</th>
+                <th>Ações</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for user in users %}
+            <tr>
+                <td>{{ user[0] }}</td> <td>{{ user[1] }}</td> <td>
+                    {% if user[2] %} <span style="color: red;">🚫 Desativado</span>
+                    {% else %}
+                        <span style="color: green;">✅ Ativo</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if user[1] == 'admin' %}
+                        <span style="color: gray; font-style: italic;">(Conta Protegida)</span>
+                    {% else %}
+                        {% if user[2] %}
+                            <form action="{{ url_for('enable_user', user_id=user[0]) }}" method="post">
+                                <button type="submit" class="btn btn-enable">Ativar</button>
+                            </form>
+                        {% else %}
+                            <form action="{{ url_for('disable_user', user_id=user[0]) }}" method="post">
+                                <button type="submit" class="btn btn-disable">Desativar</button>
+                            </form>
+                        {% endif %}
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endblock %}

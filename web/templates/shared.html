@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+    <h2>Documentos Partilhados Comigo</h2>
+    
+    {% if shared_documents %}
+        <table style="width:100%; border-collapse: collapse;">
+            <thead>
+                <tr style="background-color: #f4f4f4;">
+                    <th>Título</th>
+                    <th>Dono</th>
+                    <th>Ação</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for doc in shared_documents %}
+                <tr>
+                    <td>{{ doc[1] }}</td> <td>{{ doc[2] }}</td> <td>
+                        <a href="{{ url_for('download_shared_document', document_id=doc[0]) }}" class="btn">Baixar</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>Ainda não foram partilhados documentos contigo.</p>
+    {% endif %}
+    
+    <br>
+    <a href="{{ url_for('documents_page') }}">⬅ Voltar aos meus documentos</a>
+</section>
+{% endblock %}
