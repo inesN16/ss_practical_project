@@ -30,6 +30,12 @@ limiter = Limiter(
     storage_uri="memory://"
 )
 
+# Configuração do Rate Limiting (SR-06)
+limiter = Limiter(
+    get_remote_address,
+    app=None, # Inicializado na create_app
+    default_limits=["200 per day", "50 per hour"]
+)
 
 dotenv.load_dotenv()
 
@@ -158,6 +164,12 @@ def login_required(fn):
         return fn(*args, **kwargs)
 
     return wrapper
+
+ALLOWED_EXTENSIONS = {'pdf', 'png', 'jpg', 'jpeg', 'txt'}
+
+def allowed_file(filename):
+    return '.' in filename and \
+        filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 def register_routes(app):
 
@@ -330,18 +342,6 @@ def register_routes(app):
             username=flask.session.get("username"),
         )
 
-    # Configuração do Rate Limiting (SR-06)
-    limiter = Limiter(
-        get_remote_address,
-        app=None, # Inicializado na create_app
-        default_limits=["200 per day", "50 per hour"]
-    )
-
-    ALLOWED_EXTENSIONS = {'pdf', 'png', 'jpg', 'jpeg', 'txt'}
-
-    def allowed_file(filename):
-        return '.' in filename and \
-            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
     
 
     @app.route("/documents/upload", methods=["POST"])
