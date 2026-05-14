@@ -30,12 +30,6 @@ limiter = Limiter(
     storage_uri="memory://"
 )
 
-# Configuração do Rate Limiting (SR-06)
-limiter = Limiter(
-    get_remote_address,
-    app=None, # Inicializado na create_app
-    default_limits=["200 per day", "50 per hour"]
-)
 
 dotenv.load_dotenv()
 
