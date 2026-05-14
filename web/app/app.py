@@ -40,6 +40,25 @@ def create_app():
     app.secret_key = os.getenv("SECRET_KEY", "dev-secret")
     app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
+    # --- ADICIONEI (ZAP) ---
+    # resolve CSP, Clickjacking e X-Content-Type-Options
+    Talisman(
+        app,
+        force_https=False, # Docker local correr sem erro
+        content_security_policy={
+            'default-src': "'self'",
+            'script-src': "'self'",
+            'style-src': "'self'",
+        }
+    )
+
+    # Isto resolve o alerta de "Server Leaks Version Information"
+    @app.after_request
+    def remove_server_header(response):
+        response.headers['Server'] = 'SecureServer'
+        return response
+    # --- 
+
     register_routes(app)
 
     return app
