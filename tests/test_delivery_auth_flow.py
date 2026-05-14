@@ -1,12 +1,12 @@
 import os
 import requests
+from bs4 import BeautifulSoup
 
 BASE_URL = os.getenv("APP_BASE_URL", "http://localhost:8000")
 
 
 def _url(path: str) -> str:
     return BASE_URL.rstrip("/") + "/" + path.lstrip("/")
-
 
 def test_login_logout_flow():
     """
@@ -20,15 +20,22 @@ def test_login_logout_flow():
     """
 
     session = requests.Session()
-
     # ------------------------------------------------------------
     # Login
     # ------------------------------------------------------------
+
+    #--- adicionei ---
+    login_page = session.get(_url("/login"), timeout=10)
+    soup = BeautifulSoup(login_page.text, "html.parser")
+    csrf_token = soup.find("input", {"name": "csrf_token"})["value"]
+
+
     login_resp = session.post(
         _url("/login"),
         data={
             "username": "alice",
             "password": "tth1mJj5?£58",
+            "csrf_token": csrf_token #adicionei
         },
         allow_redirects=False,
         timeout=10,
