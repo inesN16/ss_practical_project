@@ -8,6 +8,7 @@ import dotenv
 from . import db
 from . import utils
 from werkzeug.utils import secure_filename
+from flask_talisman import Talisman 
 
 dotenv.load_dotenv()
 
@@ -40,11 +41,10 @@ def create_app():
     app.secret_key = os.getenv("SECRET_KEY", "dev-secret")
     app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
-    # --- ADICIONEI (ZAP) ---
-    # resolve CSP, Clickjacking e X-Content-Type-Options
+    # ESTAS LINHAS TÊM DE TER 4 ESPAÇOS DE AVANÇO
     Talisman(
         app,
-        force_https=False, # Docker local correr sem erro
+        force_https=False,
         content_security_policy={
             'default-src': "'self'",
             'script-src': "'self'",
@@ -52,15 +52,12 @@ def create_app():
         }
     )
 
-    # Isto resolve o alerta de "Server Leaks Version Information"
     @app.after_request
     def remove_server_header(response):
         response.headers['Server'] = 'SecureServer'
         return response
-    # --- 
 
     register_routes(app)
-
     return app
 
 '''def get_documents_for_user(cur, owner_id):
