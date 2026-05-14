@@ -7,3 +7,4 @@ PyYAML==5.1
 flask-talisman
 Flask-WTF
 beautifulsoup4
+flask-limiter
