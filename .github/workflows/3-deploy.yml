@@ -8,6 +8,7 @@ run-name: "${{ github.workflow }}"
     #    description: "Image tag to deploy (e.g., dev or a specific commit SHA)"
      #   required: true
 
+# -- adicionei -- Deploy automático após CI
 on:
   workflow_run:
     workflows: ["2 - Continuous Delivery"] # O nome exato do estágio 2

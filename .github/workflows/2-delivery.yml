@@ -108,6 +108,23 @@ jobs:
         run: |
           pytest -q tests/test_delivery_auth_flow.py
 
+
+      # --adicionei--: Testes de segurança dinâmica e OWASP ZAP --
+      - name: Run dynamic API security tests
+        continue-on-error: true 
+        run: |
+          python -m pytest -v tests_dynamic
+
+      #-- adicionei--: OWASP ZAP baseline scan --
+      - name: Run OWASP ZAP baseline scan
+        uses: zaproxy/action-baseline@v0.15.0
+        continue-on-error: true
+        with:
+          target: "http://localhost:8000" 
+          allow_issue_writing: false
+
+
+
       - name: Promote validated images to dev
         if: success()
         run: |
