@@ -6,3 +6,4 @@ python-dotenv==1.0.1
 PyYAML==5.1
 flask-talisman
 Flask-WTF
+beautifulsoup4
