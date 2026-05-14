@@ -10,6 +10,26 @@ from . import utils
 from werkzeug.utils import secure_filename
 from flask_talisman import Talisman 
 from flask_wtf.csrf import CSRFProtect
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+import logging
+
+# Configurações de logging para auditoria
+logging.basicConfig(
+    filename='audit.log', 
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger("SecureDocAuditor")
+
+
+# --limitar--
+limiter = Limiter(
+    key_func=get_remote_address,
+    default_limits=["200 per day", "50 per hour"],
+    storage_uri="memory://"
+)
+
 
 dotenv.load_dotenv()
 
@@ -39,11 +59,13 @@ def create_app():
         static_folder=str(BASE_DIR / "static"),
     )
 
+
     app.secret_key = os.getenv("SECRET_KEY", "dev-secret")
     app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
 
-
+    # Inicializar o limiter com a app
+    limiter.init_app(app)
 
     # --- Adicionei --
     csrf = CSRFProtect(app)
@@ -118,9 +140,14 @@ def extract_metadata(filename):
 
     #cmd = utils.build("stat ", str(filename), " 2>&1")
     #---adicionei---
-    cmd = utils.build("stat", str(filename))
+    #cmd = utils.build("stat", str(filename))
 
-    return utils.call(cmd)
+    #return utils.call(cmd)
+    import os
+    from datetime import datetime
+    
+    stat_info = os.stat(filename)
+    return f"Size: {stat_info.st_size} bytes, Created: {datetime.fromtimestamp(stat_info.st_ctime)}"
 
 def login_required(fn):
     @functools.wraps(fn)
@@ -238,6 +265,7 @@ def register_routes(app):
         if user_id != doc_owner_id and not is_admin and not is_shared:
             cur.close()
             conn.close()
+            logger.warning(f"SECURITY ALERT: User {user_id} denied access to Document {document_id}")
             return "Acesso Negado: Não tem permissão para ver os detalhes deste documento.", 403
 
         # Se passou a validação, montamos o dicionário para o template
@@ -251,6 +279,8 @@ def register_routes(app):
 
         cur.close()
         conn.close()
+
+        logger.info(f"AUDIT: User {user_id} accessed Document {document_id}")
         return flask.render_template("document_details.html", document=document)
 
     @app.route("/documents")
@@ -300,8 +330,23 @@ def register_routes(app):
             username=flask.session.get("username"),
         )
 
+    # Configuração do Rate Limiting (SR-06)
+    limiter = Limiter(
+        get_remote_address,
+        app=None, # Inicializado na create_app
+        default_limits=["200 per day", "50 per hour"]
+    )
+
+    ALLOWED_EXTENSIONS = {'pdf', 'png', 'jpg', 'jpeg', 'txt'}
+
+    def allowed_file(filename):
+        return '.' in filename and \
+            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+    
+
     @app.route("/documents/upload", methods=["POST"])
     @login_required
+    @limiter.limit("5 per minute")
     def upload_document():
 
         if flask.session.get("username") == "admin":
@@ -311,6 +356,11 @@ def register_routes(app):
         title = flask.request.form.get("title", "Untitled")
         uploaded_file = flask.request.files.get("document")
 
+        if not allowed_file(uploaded_file.filename):
+            logger.warning(f"AUDIT: User {user_id} tried to upload invalid file type: {uploaded_file.filename}")
+            flask.flash("Tipo de ficheiro não permitido.", "error")
+            return flask.redirect(flask.url_for("documents_page"))
+    
         if not uploaded_file or uploaded_file.filename == "":
             flask.flash("Please choose a file.", "error")
             return flask.redirect(flask.url_for("documents_page"))
@@ -338,6 +388,7 @@ def register_routes(app):
         cur.close()
         conn.close()
 
+        logger.info(f"AUDIT: User {user_id} successfully uploaded file: {filename}")
         return flask.redirect(flask.url_for("documents_page", uploaded=title))
 
     @app.route("/health")
@@ -471,6 +522,7 @@ def register_routes(app):
 
         # SEGURANÇA: Só o admin entra
         if flask.session.get("username") != "admin":
+            logger.warning(f"SECURITY ALERT: Non-admin user {flask.session.get('user_id')} tried to access Admin Panel")
             return "Acesso Restrito", 403
 
         conn = get_db()
