@@ -9,6 +9,7 @@ from . import db
 from . import utils
 from werkzeug.utils import secure_filename
 from flask_talisman import Talisman 
+from flask_wtf.csrf import CSRFProtect
 
 dotenv.load_dotenv()
 
@@ -41,6 +42,9 @@ def create_app():
     app.secret_key = os.getenv("SECRET_KEY", "dev-secret")
     app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
+    # --- Adicionei --
+    csrf = CSRFProtect(app)
+
     # ESTAS LINHAS TÊM DE TER 4 ESPAÇOS DE AVANÇO
     Talisman(
         app,
@@ -49,6 +53,8 @@ def create_app():
             'default-src': "'self'",
             'script-src': "'self'",
             'style-src': "'self'",
+            'object-src': "'none'", # Proíbe plugins como Flash
+            'base-uri': "'self'"   # Impede ataques de mudança de URL base
         }
     )
 
