@@ -17,7 +17,7 @@ def test_student_cannot_access_admin_area():
     session.post(f"{BASE_URL}/login", data=login_data)
     
     # Tenta aceder a uma rota que deveria ser só para profs/admin (ajusta o URL se necessário)
-    response = session.get(f"{BASE_URL}/admin", allow_redirects=False)
+    response = session.get(f"{BASE_URL}/admin/users", allow_redirects=False)
     assert response.status_code in (302, 303, 403)
 
 def test_path_traversal_attack_blocked():
