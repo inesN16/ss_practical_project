@@ -42,11 +42,14 @@ def create_app():
     app.secret_key = os.getenv("SECRET_KEY", "dev-secret")
     app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
+
+
+
     # --- Adicionei --
     csrf = CSRFProtect(app)
 
     # ESTAS LINHAS TÊM DE TER 4 ESPAÇOS DE AVANÇO
-    Talisman(
+    '''Talisman(
         app,
         force_https=False,
         content_security_policy={
@@ -56,7 +59,31 @@ def create_app():
             'object-src': "'none'", # Proíbe plugins como Flash
             'base-uri': "'self'"   # Impede ataques de mudança de URL base
         }
+    )'''
+    
+    # Configuração do Talisman para remover o último alerta Médio do ZAP
+    talisman = Talisman(
+        app,
+        force_https=False, 
+        content_security_policy={
+            'default-src': "'self'",
+            'script-src': "'self'",
+            'style-src': "'self'",
+            'img-src': "'self'",
+            'connect-src': "'self'",
+            'font-src': "'self'",
+            'object-src': "'none'",  # Proíbe plugins como Flash (requisito de segurança moderno)
+            'media-src': "'self'",
+            'frame-src': "'none'",   # Impede que o seu site seja colocado em frames
+            'base-uri': "'self'",
+            'form-action': "'self'"  # Garante que formulários só enviam dados para o seu próprio site
+        },
+        frame_options='DENY' # Reforça o bloqueio contra Clickjacking
     )
+
+
+
+
 
     @app.after_request
     def remove_server_header(response):
