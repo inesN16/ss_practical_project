@@ -374,14 +374,14 @@ def register_routes(app):
 
         cur.execute(
             "INSERT INTO documents (owner_id, title, filename, ...) VALUES (%s, %s, %s, %s)",
-            (user_id, title, uploaded_file.filename, metadata),  # ← filename ORIGINAL, não sanitizado!
+            (user_id, title, filename, metadata),  
         )
         cur.execute(
             """
             INSERT INTO documents (owner_id, title, filename, metadata)
             VALUES (%s, %s, %s, %s)
             """,
-            (user_id, title, uploaded_file.filename, metadata),
+            (user_id, title, filename, metadata),
         )
         conn.commit()
 
