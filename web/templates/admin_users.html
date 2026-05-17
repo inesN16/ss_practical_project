@@ -26,10 +26,12 @@
                     {% else %}
                         {% if user[2] %}
                             <form action="{{ url_for('enable_user', user_id=user[0]) }}" method="post">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                                 <button type="submit" class="btn btn-enable">Ativar</button>
                             </form>
                         {% else %}
                             <form action="{{ url_for('disable_user', user_id=user[0]) }}" method="post">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                                 <button type="submit" class="btn btn-disable">Desativar</button>
                             </form>
                         {% endif %}

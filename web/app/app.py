@@ -13,6 +13,7 @@ from flask_wtf.csrf import CSRFProtect
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 import logging
+from werkzeug.security import check_password_hash
 
 # Configurações de logging para auditoria
 logging.basicConfig(
@@ -42,6 +43,8 @@ DB_PASSWORD = os.getenv("DB_PASSWORD", "postgres")
 DB_NAME = os.getenv("DB_NAME", "docdb")
 
 UPLOAD_FOLDER = "uploads"
+ALLOWED_EXTENSIONS = {'pdf', 'png', 'jpg', 'jpeg', 'txt'}
+
 
 def get_db():
     return psycopg2.connect(
@@ -53,6 +56,7 @@ def get_db():
     )
 
 def create_app():
+    
     app = flask.Flask(
         __name__,
         template_folder=str(BASE_DIR / "templates"),
@@ -61,6 +65,11 @@ def create_app():
 
 
     app.secret_key = os.getenv("SECRET_KEY", "dev-secret")
+    #secret_key = os.getenv("SECRET_KEY")
+    #if not secret_key:
+    #    raise RuntimeError("SECRET_KEY não definida!")
+
+    #app.secret_key = secret_key
     app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
 
@@ -115,15 +124,7 @@ def create_app():
     register_routes(app)
     return app
 
-'''def get_documents_for_user(cur, owner_id):
-    query = f"""
-        SELECT id,title,filename,uploaded_at
-        FROM documents
-        WHERE owner_id=%s
-        ORDER BY uploaded_at DESC
-    """ % owner_id
-    cur.execute(query)
-    return cur.fetchall() '''
+
 
 def get_documents_for_user(cur, owner_id):
     query = """
@@ -141,13 +142,13 @@ def extract_metadata(filename):
     #cmd = utils.build("stat ", str(filename), " 2>&1")
     #---adicionei---
     #cmd = utils.build("stat", str(filename))
-
     #return utils.call(cmd)
     import os
     from datetime import datetime
     
     stat_info = os.stat(filename)
     return f"Size: {stat_info.st_size} bytes, Created: {datetime.fromtimestamp(stat_info.st_ctime)}"
+
 
 def login_required(fn):
     @functools.wraps(fn)
@@ -159,11 +160,16 @@ def login_required(fn):
 
     return wrapper
 
-ALLOWED_EXTENSIONS = {'pdf', 'png', 'jpg', 'jpeg', 'txt'}
+
+# usamos sempre esta função que verifica o user_id == 1 na BD.
+def is_admin_user():
+    return flask.session.get("user_id") == 1
+ 
 
 def allowed_file(filename):
     return '.' in filename and \
         filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
 
 def register_routes(app):
 
@@ -173,7 +179,9 @@ def register_routes(app):
             return flask.redirect(flask.url_for("documents_page"))
         return flask.redirect(flask.url_for("login"))
 
+
     @app.route("/login", methods=["GET", "POST"])
+    @limiter.limit("10 per minute")
     def login():
 
         if flask.request.method == "POST":
@@ -182,26 +190,25 @@ def register_routes(app):
 
             conn = get_db()
             cur = conn.cursor()
-
             user = db.get_user_by_username(cur, username)
-
             cur.close()
             conn.close()
 
-            is_admin = username == "admin"
+            #is_admin = username == "admin"
 
-            if user and (user[2] == password and not user[3]) or is_admin:
+            #if user and (user[2] == password and not user[3]) or is_admin:
+            if user and check_password_hash(user[2], password) and not user[3]:        
                 flask.session.clear()
                 flask.session["user_id"] = user[0] if username != "admin" else 1
                 flask.session["username"] = user[1] if username != "admin" else username
                 
                 # NOVO REDIRECIONAMENTO SEGURO
-                if username == "admin":
+                if is_admin_user():
                     return flask.redirect(flask.url_for("admin_users"))
                 else:
                     return flask.redirect(flask.url_for("documents_page"))
 
-
+            logger.warning(f"AUDIT: Failed login attempt for username='{username}'")
             flask.flash("Invalid credentials.", "error")
 
         return flask.render_template("login.html")
@@ -247,7 +254,7 @@ def register_routes(app):
     def document_details(document_id):
         
         user_id = flask.session.get("user_id")
-        is_admin = flask.session.get("username") == "admin"
+        #is_admin = flask.session.get("username") == "admin"
 
         conn = get_db()
         cur = conn.cursor()
@@ -268,7 +275,7 @@ def register_routes(app):
         is_shared = cur.fetchone() is not None
 
         # 3. VALIDAÇÃO DE SEGURANÇA: Se não for dono, nem admin, nem tiver partilha... BLOQUEAR!
-        if user_id != doc_owner_id and not is_admin and not is_shared:
+        if user_id != doc_owner_id and not is_admin_user() and not is_shared:
             cur.close()
             conn.close()
             logger.warning(f"SECURITY ALERT: User {user_id} denied access to Document {document_id}")
@@ -293,28 +300,22 @@ def register_routes(app):
     @login_required
     def documents_page():
 
-        if flask.session.get("username") == "admin":
+        if is_admin_user():
             return flask.redirect(flask.url_for("admin_users"))
     
-        requested_user_id = flask.request.args.get("user_id")
         current_user_id = flask.session.get("user_id")
-
-        owner_id = requested_user_id or current_user_id
-        #--adicionei---
+        requested_user_id = flask.request.args.get("user_id")
+ 
         if requested_user_id and str(requested_user_id) != str(current_user_id):
-            if flask.session.get("username") != "admin":
-                owner_id = current_user_id
-                flask.flash("Apenas pode ver os seus próprios documentos.", "error")
-            else:
-                owner_id = requested_user_id
+            owner_id = current_user_id
+            flask.flash("Apenas pode ver os seus próprios documentos.", "error")
         else:
             owner_id = current_user_id
-    
+
+
         conn = get_db()
         cur = conn.cursor()
-
         docs = get_documents_for_user(cur, owner_id)
-
         cur.close()
         conn.close()
 
@@ -343,33 +344,38 @@ def register_routes(app):
     @limiter.limit("5 per minute")
     def upload_document():
 
-        if flask.session.get("username") == "admin":
+        if is_admin_user():
             return "Operação não permitida para administradores", 403
     
         user_id = flask.session.get("user_id")
         title = flask.request.form.get("title", "Untitled")
         uploaded_file = flask.request.files.get("document")
 
+        if not uploaded_file or uploaded_file.filename == "":
+            flask.flash("Please choose a file.", "error")
+            return flask.redirect(flask.url_for("documents_page"))
+ 
         if not allowed_file(uploaded_file.filename):
             logger.warning(f"AUDIT: User {user_id} tried to upload invalid file type: {uploaded_file.filename}")
             flask.flash("Tipo de ficheiro não permitido.", "error")
             return flask.redirect(flask.url_for("documents_page"))
-    
-        if not uploaded_file or uploaded_file.filename == "":
-            flask.flash("Please choose a file.", "error")
-            return flask.redirect(flask.url_for("documents_page"))
-
+ 
         upload_folder = BASE_DIR / app.config["UPLOAD_FOLDER"]
         upload_folder.mkdir(parents=True, exist_ok=True)
+ 
 
         filename = utils.sanitize_filename(uploaded_file.filename)
-        destination = upload_folder / uploaded_file.filename
+        destination = upload_folder / filename
         uploaded_file.save(destination)
         metadata = extract_metadata(destination)
 
         conn = get_db()
         cur = conn.cursor()
 
+        cur.execute(
+            "INSERT INTO documents (owner_id, title, filename, ...) VALUES (%s, %s, %s, %s)",
+            (user_id, title, uploaded_file.filename, metadata),  # ← filename ORIGINAL, não sanitizado!
+        )
         cur.execute(
             """
             INSERT INTO documents (owner_id, title, filename, metadata)
@@ -454,7 +460,6 @@ def register_routes(app):
     @login_required
     def download_document(document_id):
         user_id = flask.session.get("user_id")
-        is_admin = flask.session.get("username") == "admin"
         
         conn = get_db()
         cur = conn.cursor()
@@ -468,7 +473,7 @@ def register_routes(app):
         cur.execute("SELECT 1 FROM document_shares WHERE document_id = %s AND shared_with = %s", (document_id, user_id))
         is_shared = cur.fetchone() is not None
 
-        if user_id != owner_id and not is_admin and not is_shared:
+        if user_id != owner_id and not is_admin_user() and not is_shared:
             cur.close()
             conn.close()
             return "Acesso Negado", 403
@@ -486,6 +491,13 @@ def register_routes(app):
 
         shared_with_id = flask.request.form.get("shared_with")
         owner_id = flask.session.get("user_id")
+
+        # VALIDAÇÃO DE SEGURANÇA EXTRA: Impedir partilha com o admin (ID 1)
+        if str(shared_with_id) == "1":
+            logger.warning(f"SECURITY ALERT: User {owner_id} tried to share Document {document_id} with Admin account.")
+            flask.flash("Operação inválida: Não é permitido partilhar documentos com o administrador.", "error")
+            return flask.redirect(flask.url_for("documents_page"))
+
 
         conn = get_db()
         cur = conn.cursor()
@@ -515,7 +527,7 @@ def register_routes(app):
     def admin_users():
 
         # SEGURANÇA: Só o admin entra
-        if flask.session.get("username") != "admin":
+        if not is_admin_user():
             logger.warning(f"SECURITY ALERT: Non-admin user {flask.session.get('user_id')} tried to access Admin Panel")
             return "Acesso Restrito", 403
 
@@ -531,7 +543,8 @@ def register_routes(app):
     @app.route("/admin/users/<int:user_id>/enable", methods=["POST"])
     @login_required
     def enable_user(user_id):
-        if flask.session.get("username") != "admin": return "403", 403
+        
+        if not is_admin_user(): return "403", 403
         
         conn = get_db()
         cur = conn.cursor()
@@ -545,7 +558,8 @@ def register_routes(app):
     @app.route("/admin/users/<int:user_id>/disable", methods=["POST"])
     @login_required
     def disable_user(user_id):
-        if flask.session.get("username") != "admin": 
+        
+        if not is_admin_user(): 
             return "403", 403
         
         # SEGURANÇA EXTRA: Impedir que o admin (ID 1) se desative a si próprio

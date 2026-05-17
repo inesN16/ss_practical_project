@@ -15,6 +15,8 @@
 
     <h4>Partilhar este documento</h3>
     <form action="{{ url_for('share_document', document_id=document.id) }}" method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
         <label for="shared_with">ID do Utilizador:</label>
         <input type="number" name="shared_with" placeholder="Ex: 3" required>
         <button type="submit">Partilhar</button>
